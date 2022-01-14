@@ -31,14 +31,14 @@ class threejsViewer {
 
         // Light
         let directionalLight = new THREE.DirectionalLight(0xffffff, 1)
-        directionalLight.position.set(2, 1, 2)   
+        directionalLight.position.set(2, 1, 2)
         this.scene.add(directionalLight)
 
         // Controller
         let controller = new OrbitControls(this.camera, this.renderer.domElement)
         controller.target.set(0, 0.5, 0)
         controller.update()
-        
+
         //Axis Landmark
         const axesHelper = new THREE.AxesHelper(100)
         this.scene.add(axesHelper)
@@ -46,7 +46,7 @@ class threejsViewer {
         // Ground
         const plane = new THREE.Mesh(
             new THREE.CircleGeometry(2, 30),
-            new THREE.MeshPhongMaterial({ color: 0xbbddff, opacity:0.4, transparent: true })
+            new THREE.MeshPhongMaterial({ color: 0xbbddff, opacity: 0.4, transparent: true })
         );
         plane.rotation.x = - Math.PI / 2;
         this.scene.add(plane);
@@ -68,6 +68,62 @@ class threejsViewer {
             this.camera.aspect = width / height
             this.camera.updateProjectionMatrix();
         })
+
+        let mesh = null;
+        this.loadData = () => {
+            mesh = new MarchingCubes(this.size);
+            mesh.material = new THREE.MeshNormalMaterial({ color: 0xff00ff });
+            mesh.isolation = this.threshold;
+            mesh.field = this.databuffer;
+
+            this.scene.add(mesh);
+        }
+
+        this.updateModel = () => {
+            let mesh = this.scene.getObjectByName('mesh')
+
+            if (mesh === undefined || mesh == null) {
+                this.mesh = new MarchingCubes(this.size);
+                this.mesh.name = 'mesh'
+
+                if (this.textureOption == 0) {
+                    this.mesh.material = new THREE.MeshNormalMaterial();
+                }
+                if (this.textureOption == 1) {
+                    this.mesh.material = new THREE.MeshPhongMaterial();
+                }
+
+                this.mesh.isolation = this.threshold;
+                this.mesh.field = this.databuffer;
+
+                this.mesh.position.set(0, 1, 0)
+
+                this.scene.add(this.mesh);
+
+                console.log(mesh)
+                return this.mesh;
+            }
+            else {
+                this.mesh.isolation = this.threshold;
+                this.mesh.field = this.databuffer;
+
+                if (this.textureOption == 0) {
+                    this.mesh.material = new THREE.MeshNormalMaterial();
+                }
+                if (this.textureOption == 1) {
+                    this.mesh.material = new THREE.MeshPhongMaterial();
+                }
+
+                this.mesh.position.set(0, 1, 0)
+            }
+        }
+
+        this.download = () => {
+            console.log(this.mesh)
+            let geo = this.mesh.generateGeometry()
+            let mesh = new THREE.Mesh(geo)
+            return mesh;
+        }
 
         this.renderScene()
     }

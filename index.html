@@ -1,5 +1,6 @@
 <!DOCTYPE HTML>
 <html>
+
 <head>
     <meta charset='utf-8'>
     <meta name='viewport' content='width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0'>
@@ -12,7 +13,7 @@
             width: 100%;
             display: flex;
             color: white;
-            margin-top:10px;
+            margin-top: 10px;
         }
 
         .labelInput {
@@ -23,7 +24,7 @@
         .frostedGlass {
             border-radius: 20px;
             overflow: hidden;
-            background-color: rgba(0,0,0,0.8);
+            background-color: rgba(0, 0, 0, 0.8);
             backdrop-filter: blur(5px)
         }
 
@@ -32,8 +33,8 @@
             padding: 8px;
             margin: 2px;
             border-radius: 4px;
-            text-align:center;
-            flex-basis:auto;
+            text-align: center;
+            flex-basis: auto;
             flex-grow: 1;
             flex-shrink: 1;
         }
@@ -109,12 +110,16 @@
             -moz-transition: max-height 0.8s ease-in-out;
         }
 
-        .noDisplay{
-            display:none
+        .noHover {
+            pointer-events: none;
         }
 
+        .noDisplay {
+            display: none
+        }
     </style>
 </head>
+
 <body style="padding:0px;margin:0px;width:100vw;height:100vh">
     <div id="info" style="position:absolute;top:0px; left:0px"></div>
     <div id="controlPanel" class="controlPanel frostedGlass" data-collapsed="false">
@@ -126,21 +131,21 @@
         <div class="panelContent open">
             <div class="settingForm">
                 <label class="btnLabel"><input type="file" name="settingForm" accept=".raw">load RAW</label>
-                <label class="btnLabel" name="settingForm">save Model</label>
+                <label class="btnLabel noHover" id="save" name="settingForm">save Model</label>
             </div>
 
             <!--閥值-->
             <div class="labelLayout">
-                <label for="isovalueSlider">閥值:0/0</label>
-                <input class="labelInput" id="isovalueSlider" type="range" name="settingForm" min=0 max=1000>
+                <label for="isovalueSlider" id="iso"> 閥值:0/0</label>
+                <input class="labelInput" id="isovalueSlider" type="range" name="settingForm" min=0 max=255 disabled>
             </div>
 
             <!--紋理-->
             <div class="labelLayout">
                 <label>Texture:</label>
-                <select class="labelInput" name="settingForm">
-                    <option value=0 selected>option 1</option>
-                    <option value=1>option 2</option>
+                <select class="labelInput" id="select" name="settingForm" disabled>
+                    <option value=0 selected>MeshNormalMaterial</option>
+                    <option value=1>MeshPhongMaterial</option>
                 </select>
             </div>
 
@@ -159,7 +164,7 @@
     <script src="js/scoreoutputer.min.js"></script>
     <script>
         // 建構子 ScoreOutputer 接受一個字串，該字串為 csv 的檔案名稱
-        var so = new ScoreOutputer("109114514");
+        var so = new ScoreOutputer("109598402");
         so.installCSS(function () {
             // 安裝 bootstrap 的 css，如果在 html 上方引用 bootstrap 5.1.1 的話就不用使用 installCSS ，注意一定要 bootstrap css 5.1.1 版
             // installCSS 接收一個 callback 當作參數，作為成功安裝 bootstrap css 的回呼函式
@@ -172,9 +177,9 @@
             //addChild 要比 renderModal 先呼叫
             so.addChild("讀取文件並顯示資訊", 4, true);
             so.addChild("生成模型", 2, true);
-            so.addChild("閥值控制", 1, false);
-            so.addChild("文件下載", 1, false);
-            so.addChild("材質更換", 2, false);
+            so.addChild("閥值控制", 1, true);
+            so.addChild("文件下載", 1, true);
+            so.addChild("材質更換", 2, true);
 
             //產生自評表，參數如下所示
             so.renderModal(
@@ -208,6 +213,7 @@
 
         import { threejsViewer } from './jsm/threejsViewer.js'
         import { STLExporter } from "./threejs/examples/jsm/exporters/STLExporter.js";
+        import { PLYExporter } from "./threejs/examples/jsm/exporters/PLYExporter.js";
 
         const fileRegex = /(\w+)_(\d+)x(\d+)x(\d+)_(\w+)\.*/;
 
@@ -234,31 +240,110 @@
                 }
             })
 
+            let isload = false;
             let elements = document.getElementsByName('settingForm')
 
             // RAW文件讀取
             elements[0].addEventListener('change', (evt) => {
+                let fr = new FileReader();
+                let files = evt.target.files;
+                if (files.length <= 0) {
+                    return;
+                }
+
+                let file = evt.target.files[0];
+
+                let filename = file.name;
+                filename = filename.split(".")
+                let values = filename[0].split("_")
+
+                let width = values[1]
+                let height = values[2]
+                let depth = values[3]
+                let byte = values[4]
+
+                let max = Math.max(width, height, depth);
+
+                let data = null;
+                let paddingData = null;
+
+                fr.onload = () => {
+                    let result = fr.result
+                    if (byte == 'uint8') {
+                        data = new Uint8Array(result)
+
+                        paddingData = new Uint8Array(max * max * max);
+
+                        for (let i = 0; i < data.length; i++) {
+                            paddingData[i] = data[i]
+                        }
+
+                        modelView.databuffer = paddingData;
+                        modelView.size = max;
+                        modelView.threshold = 75;
+
+                        document.getElementById("save").className = "btnLabel"
+                        document.getElementById('iso').innerHTML = '閥值:75/255';
+                        elements[2].value = 75;
+                        document.getElementById('isovalueSlider').disabled = false;
+                        document.getElementById('select').disabled = false;
+                        
+                        modelView.updateModel()
+                        alert("影像的長/寬/張數:" + width + "*" + height + "*" + depth + "\n" + "位元(" + byte + " bit)")
+                        isload = true;
+                    }
+                }
+                fr.readAsArrayBuffer(file)
 
             })
 
             // 模型資料下載
             elements[1].addEventListener('click', (evt) => {
+                if (!isload) return;
+                let exporter = new STLExporter()
+                let mesh = modelView.download()
+
+                let result = exporter.parse(mesh, { binary: true })
+                let blob = new Blob([result], { type: 'application/octet-stream' })
+
+                //or
+
+                // let result = exporter.parse(mesh, {binary: false})
+                // let blob = new Blob([result],type:'text/plain')
+
+
+                let dlLink = document.createElement('a')
+                dlLink.href = URL.createObjectURL(blob)
+                dlLink.download = 'model.stl'
+
+                dlLink.click()
 
             })
 
             // 閥值設定
             elements[2].addEventListener('click', (evt) => {
+                if (!isload) return;
+                let isoValue = evt.srcElement.value;
+                document.getElementById('iso').innerHTML = '閥值:' + isoValue + '/255';
+                modelView.threshold = isoValue;
+                // 閥值:0/0
+
+                console.log(isoValue)
+                modelView.updateModel()
 
             })
 
             // 紋理設置
             elements[3].addEventListener('change', (evt) => {
-
+                if (!isload) return;
+                let selectedTextureIndex = evt.srcElement.value;
+                console.log(selectedTextureIndex)
+                modelView.textureOption = selectedTextureIndex;
+                modelView.updateModel()
             })
 
             // 模型網格顯示
             elements[4].addEventListener('change', (evt) => {
-
             })
         }
 
@@ -266,4 +351,5 @@
     </script>
 
 </body>
+
 </html>
